@@ -46,7 +46,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern SPI_HandleTypeDef hspi1;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,6 +95,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
   uint8_t tx_buffer[3] = {0x01,0x80,0x0}; // start byte, channel 0 on single end, dummy byte - transfer to ADC
   uint8_t rx_buffer[3] = {0,0,0}; //for receiving data from ADC
+  uint16_t timer_period = 64000;
+  uint16_t ON_time = timer_period*0.05; //5% duty cycle -> minimum
+  uint16_t adc_max = 1023; //maximum value for ADC
+
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1); //start PWM wave
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, ON_time); //sets duty cycle for PWM
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET); //in case cs starts low, as it must go from high to low for SPI
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -108,10 +117,9 @@ int main(void)
 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET); //set CS (chip select) to low to begin communication
 	  HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 3, HAL_MAX_DELAY); //SPI handle (SPI1), transfer buffer, receive buffer, #bytes, delay to timeout
 	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET); //set CS back to high to end comms
-	  uint8_t adc_value = ((rx_buffer[1] & 0x03) << 8) | (rx_buffer[2]);
-
-
-
+	  uint16_t adc_value = ((rx_buffer[1] & 0x03) << 8) | (rx_buffer[2]);
+	  ON_time = 3200 + (3200*adc_value)/adc_max; // minimum on time of 3200 (5%), scaling to maximum of 6400 (10%)
+	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, ON_time); //sets duty cycle for PWM
 
 
 	  HAL_Delay(10);
